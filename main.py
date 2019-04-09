@@ -1,8 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
-import yeelight
+from yeelight import *
 import datetime
-
+bulb = Bulb("192.168.0.16")
 
 
 def grab_location_data():
@@ -20,7 +20,7 @@ def grab_location_data():
       'span', class_='wr-c-astro-data__time'
       )
     sun = []
-    
+  
     for tag in range(len(astro)):
       sun.append(astro[tag].getText())
     return sun
@@ -74,24 +74,43 @@ def Current_YeeState():
   else:
     modestate = Mode["Eve"]
 
-  modestate
-  
-  weatherstate = weather[str(now.hour + 2)]
-  
+  if now.hour < 22:
+    nicetime = str(now.hour - 2)
+  else:
+    nicetime = str(0) + str(now.hour - 22)
+
+  weatherstate = weather[nicetime]
+
+  if modestate == 0:
+    bulb.turn_on()
+    bulb.set_color_temp(3600)
+    if weatherstate == 'Light Cloud':
+      bulb.set_brightness(70)
+    if weatherstate == 'Sunny Intervals':
+      bulb.set_brightness(40)
+    if weatherstate == 'Sunny':
+      bulb.set_brightness(10)
+  elif modestate == 1:
+    bulb.turn_on()
+    bulb.set_brightness(60)
+    bulb.set_color_temp(3200)
+  else:
+    bulb.turn_off()
 
 
-  # if modestate == 0:
-  #   yeelight.turn_on()
-  # elif modestate == 1:
-  #   pass
-  # else:
-  #   yeelight.turn_off()
-  print (modestate)
-  print (weathernow)
+# Current_YeeState()
+bulb.turn_on()
+transitions = [
+    TemperatureTransition(3200, duration=1000),
 
+]
 
-Current_YeeState()
-yeelight.discover_bulbs()
+flow = Flow(
+    count=1,
+    action=Flow.actions.stay,
+    transitions=transitions
+)
+bulb.start_flow(flow)
 
 #need to creat a function that computes the yeelight state for each time
 #funtion that takes previous function and writes a yeelight flow based on that data
