@@ -8,14 +8,14 @@ bulb = Bulb("192.168.0.16")
 def grab_location_data():
   """Gets the weather and astrological data for your location from BBC Weather"""
 
-  print ('Enter the first half of your post code')
+  # print ('Enter the first half of your post code') #Just hard coded my location to make testing easier
   post_code = 'b24'
   url = 'https://www.bbc.co.uk/weather/' + post_code
   r = requests.get(url)
   soup = BeautifulSoup(r.text, 'html.parser')
   
-  def sun_data(self):
-    #Collect sunrise and sunset data
+  def sun_data(soup):
+    """Collect sunrise and sunset data"""
     astro = soup.find_all(
       'span', class_='wr-c-astro-data__time'
       )
@@ -26,7 +26,7 @@ def grab_location_data():
     return sun
 
   def weather_data(soup):
-    #Collect the weather condition for each time slot of the day
+    """Collect the weather condition for each time slot of the day"""
     timeslots = soup.find_all(class_="wr-time-slot wr-js-time-slot")
     weather_today = {} 
 
@@ -35,89 +35,125 @@ def grab_location_data():
         time = (tag.getText())
       for tag in timeslot.find_all('div', class_='wr-weather-type__icon'):
         weathertype = tag.get('title')
+      
+      #Organises the weather at each time into a dictionary
       weather_today.update({
         time    :   weathertype
         })
+
     return weather_today
+  
+  #Collects the data from the two functions
   sun = sun_data(soup)
   weather = weather_data(soup)
+
   return [sun, weather]
-  
-  
 
+#Stores the data so website is only needs one scrapping
+(sun, weather) = grab_location_data()
 
-Mode = {
-  "Day"   :   0,
-  "Eve"   :   1,
-  "Night" :   2
-}
-
-Condition = {
-  "Sunny"           :   0,
-  "Sunny Intervals" :   1,
-  "Light Cloud"     :   2,
-}
-
-def Current_YeeState():
+def YeeState(offset, sun, weather):
+  """Searches the data and returns the time and weather state given a time offset (hours) from the present (0 = current weather and timestate) for example YeeState(1, sun, weather) might return Clear Sky, Eve"""
   now = datetime.datetime.now()
-  (sun, weather) = grab_location_data()
-  (h, m) = sun[0].split(":")
-  sunrise = int(h) * 3600 + int(m) * 60
-  (h, m) = sun[1].split(":")
-  sunset = int(h) * 3600 + int(m) * 60
-  timenow = now.hour * 3600 + now.minute * 60 + now.second
   
-  if timenow < sunrise or (23*3600) < timenow:
-    modestate = Mode["Night"]
-  elif timenow < sunset:
-    modestate = Mode["Day"]
+  (h, m) = sun[0].split(":")
+  sunrise = int(h) * 3600 + int(m + 30) * 60
+  (h, m) = sun[1].split(":")
+  sunset = int(h) * 3600 + int(m - 30) * 60
+  timenow = (1 + now.hour) * 3600 + now.minute * 60 + now.second
+  
+  time = timenow + offset*3600
+
+  if sunrise < time < sunset:
+    TimeState = "Day"
+  elif sunset < time < (23*3600):
+    TimeState = "Eve"
   else:
-    modestate = Mode["Eve"]
+    TimeState = "Night"
 
-  if now.hour < 22:
-    nicetime = str(now.hour - 2)
+  if 10 <= int(time / 3600) < 24:
+    nicetime = str(int(time / 3600))
+  elif 24 <=  int(time / 3600):
+    nicetime = str(0) + str(int(time / 3600) - 24)
   else:
-    nicetime = str(0) + str(now.hour - 22)
+    nicetime = str(0) + str(int(time / 3600))
 
-  weatherstate = weather[nicetime]
+  
+  WeatherState = weather[nicetime]
 
-  if modestate == 0:
-    bulb.turn_on()
-    bulb.set_color_temp(3600)
-    if weatherstate == 'Light Cloud':
-      bulb.set_brightness(70)
-    if weatherstate == 'Sunny Intervals':
-      bulb.set_brightness(40)
-    if weatherstate == 'Sunny':
-      bulb.set_brightness(10)
-  elif modestate == 1:
-    bulb.turn_on()
-    bulb.set_brightness(60)
-    bulb.set_color_temp(3200)
-  else:
-    bulb.turn_off()
+  return (WeatherState, TimeState)
 
 
-# Current_YeeState()
-bulb.turn_on()
-transitions = [
-    TemperatureTransition(3200, duration=1000),
+##### Maybe I can figure out how to nest functions in a dicitonary rather than using an if tree, might make the code look better #####
 
-]
+# ModeDefine = {
+#   0 : bulb.turn_off(),
+#   1 : (bulb.set_brightness(10), bulb.set_color_temp(3600)),
+#   2 : (bulb.set_brightness(40), bulb.set_color_temp(3200)),
+#   3 : (bulb.set_brightness(60), bulb.set_color_temp(3200)),
+#   4 : (bulb.set_brightness(70), bulb.set_color_temp(3100))
+# }
 
-flow = Flow(
-    count=1,
-    action=Flow.actions.stay,
-    transitions=transitions
-)
-bulb.start_flow(flow)
 
-#need to creat a function that computes the yeelight state for each time
-#funtion that takes previous function and writes a yeelight flow based on that data
-#tell yeelight to use that flow
+def CreateFlowTransitions():
+  """This uses the the time and weather states to write a transition list"""
+  transition =[]
+  
+  # Defines the YeeLight mode based on the time and weather conditions
+  ModeSelect = {
+  "Day" : {
+    "Light Cloud"     : 2,
+    "Partly Cloudy"   : 2,
+    "Rain"            : 3,
+    "Sunny Intervals" : 1,
+    "Clear Sky"       : 0,
+    "Sunny"           : 0
+    },
+    "Eve" : {
+    "Light Cloud"     : 4,
+    "Partly Cloudy"   : 4,
+    "Rain"            : 4,
+    "Sunny Intervals" : 4,
+    "Clear Sky"       : 4,
+    "Sunny"           : 4
+    },
+    "Night" : {
+    "Light Cloud"     : 0,
+    "Partly Cloudy"   : 0,
+    "Rain"            : 0,
+    "Sunny Intervals" : 0,
+    "Clear Sky"       : 0,
+    "Sunny"           : 0
+    }
+  }
+  print("Today's Forecast:")
+  for timeperiod in range(1, 29 - datetime.datetime.now().hour):
+    # Asks YeeState for the Time and Weather states for the next few hours, then uses those states to figure out which mode the YeeLight should be in and then writes a transition for this.
 
-# So the basic idea is to use the astro data and weather data to figure out what state the light should be in at any given time of the day and then creat a flow schedule that will be uploaded to the light and configure it for the coming week. 
-# For example, in the middle of the day when it is sunny outside the light should be off, if it is sunny intermittently it should be on low brightness, if it is cloudy then the light should be on but on medium brightness, if it is night time then it should come on fully.
+    (WeatherState, TimeState) = YeeState(timeperiod, sun, weather)
+    print (WeatherState, TimeState)
+    ModeDefine = ModeSelect[TimeState][WeatherState]
 
-#{'06:24': '19:55', '06:22': '19:57', '06:20': '19:58', '06:17': '20:00', '06:15': '20:02', '06:13': '20:04', '06:10': '20:05', '06:08': '20:07', '06:06': '20:09', '06:04': '20:11', '06:02': '20:12', '06:00': '20:14', '05:57': '20:16', '05:55': '20:18'}
-#{'12': 'Light Cloud', '13': 'Light Cloud', '14': 'Light Cloud', '15': 'Light Cloud', '16': 'Sunny Intervals', '17': 'Sunny Intervals', '18': 'Sunny Intervals', '19': 'Sunny Intervals', '20': 'Partly Cloudy', '21': 'Partly Cloudy', '22': 'Partly Cloudy', '23': 'Light Cloud', '00': 'Light Cloud', '01': 'Light Cloud', '02': 'Partly Cloudy', '03': 'Partly Cloudy', '04': 'Partly Cloudy', '05': 'Partly Cloudy'}
+    #Defines which action the YeeLight should take based on each mode
+    if ModeDefine == 0:
+      transition.append(TemperatureTransition(3200, duration=(3600000), brightness=0))
+    elif ModeDefine == 1:
+      transition.append(TemperatureTransition(3600, duration=(3600000), brightness=10))
+    elif ModeDefine == 2:
+      transition.append(TemperatureTransition(3200, duration=(3600000), brightness=40))
+    elif ModeDefine == 3:
+      transition.append(TemperatureTransition(3600, duration=(3600000), brightness=60))
+    else:
+      transition.append(TemperatureTransition(3200, duration=(3600000), brightness=70))
+  return transition
+
+print (CreateFlowTransitions())
+
+              ####Activate when testing####
+# bulb.turn_on()
+# weatherflow = Flow(
+#     count=1,
+#     action=Flow.actions.off,
+#     transitions=transitions
+# )
+# bulb.start_flow(weatherflow)
