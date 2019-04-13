@@ -57,9 +57,9 @@ def YeeState(offset, sun, weather):
   now = datetime.datetime.now()
   
   (h, m) = sun[0].split(":")
-  sunrise = int(h) * 3600 + int(m + 30) * 60
+  sunrise = int(h) * 3600 + int(m) * 60
   (h, m) = sun[1].split(":")
-  sunset = int(h) * 3600 + int(m - 30) * 60
+  sunset = int(h) * 3600 + int(m) * 60
   timenow = (1 + now.hour) * 3600 + now.minute * 60 + now.second
   
   time = timenow + offset*3600
@@ -127,7 +127,13 @@ def CreateFlowTransitions():
     }
   }
   print("Today's Forecast:")
-  for timeperiod in range(1, 29 - datetime.datetime.now().hour):
+
+  if (29 - datetime.datetime.now().hour) < 9:
+    runtime = 29 - datetime.datetime.now().hour
+  else:
+    runtime = 9
+
+  for timeperiod in range(runtime):
     # Asks YeeState for the Time and Weather states for the next few hours, then uses those states to figure out which mode the YeeLight should be in and then writes a transition for this.
 
     (WeatherState, TimeState) = YeeState(timeperiod, sun, weather)
@@ -136,7 +142,7 @@ def CreateFlowTransitions():
 
     #Defines which action the YeeLight should take based on each mode
     if ModeDefine == 0:
-      transition.append(TemperatureTransition(3200, duration=(3600000), brightness=0))
+      transition.append(TemperatureTransition(3700, duration=(3600000), brightness=10))
     elif ModeDefine == 1:
       transition.append(TemperatureTransition(3600, duration=(3600000), brightness=10))
     elif ModeDefine == 2:
@@ -147,13 +153,15 @@ def CreateFlowTransitions():
       transition.append(TemperatureTransition(3200, duration=(3600000), brightness=70))
   return transition
 
-print (CreateFlowTransitions())
+transition = CreateFlowTransitions()
 
               ####Activate when testing####
-# bulb.turn_on()
-# weatherflow = Flow(
-#     count=1,
-#     action=Flow.actions.off,
-#     transitions=transitions
-# )
-# bulb.start_flow(weatherflow)
+bulb.turn_on()
+flow = Flow(
+    count=1,
+    action=Flow.actions.off,
+    transitions = transition
+)
+# bulb.set_brightness(100)
+bulb.start_flow(flow)
+print (bulb.get_properties())
