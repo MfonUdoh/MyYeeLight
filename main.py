@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 from yeelight import *
 import datetime
-bulb = Bulb("192.168.0.16")
+bulb = Bulb(discover_bulbs()[0]['ip'])
 
 
 def grab_location_data():
@@ -102,28 +102,37 @@ def CreateFlowTransitions():
   # Defines the YeeLight mode based on the time and weather conditions
   ModeSelect = {
   "Day" : {
-    "Light Cloud"     : 2,
-    "Partly Cloudy"   : 2,
-    "Rain"            : 3,
-    "Sunny Intervals" : 1,
-    "Clear Sky"       : 0,
-    "Sunny"           : 0
+    "Light Cloud"         : 2,
+    "Partly Cloudy"       : 2,
+    "Light Rain Showers"  : 2,
+    "Light Rain"          : 2,
+    "Heavy Rain"          : 3,
+    "Rain"                : 3,
+    "Sunny Intervals"     : 1,
+    "Clear Sky"           : 0,
+    "Sunny"               : 0
     },
     "Eve" : {
-    "Light Cloud"     : 4,
-    "Partly Cloudy"   : 4,
-    "Rain"            : 4,
-    "Sunny Intervals" : 4,
-    "Clear Sky"       : 4,
-    "Sunny"           : 4
+    "Light Cloud"         : 4,
+    "Light Rain Showers"  : 4,
+    "Light Rain"          : 4,
+    "Heavy Rain"          : 4,
+    "Partly Cloudy"       : 4,
+    "Rain"                : 4,
+    "Sunny Intervals"     : 4,
+    "Clear Sky"           : 4,
+    "Sunny"               : 4
     },
     "Night" : {
-    "Light Cloud"     : 0,
-    "Partly Cloudy"   : 0,
-    "Rain"            : 0,
-    "Sunny Intervals" : 0,
-    "Clear Sky"       : 0,
-    "Sunny"           : 0
+    "Light Cloud"         : 0,
+    "Light Rain Showers"  : 0,
+    "Light Rain"          : 0,
+    "Heavy Rain"          : 0,
+    "Partly Cloudy"       : 0,
+    "Rain"                : 0,
+    "Sunny Intervals"     : 0,
+    "Clear Sky"           : 0,
+    "Sunny"               : 0
     }
   }
   print("Today's Forecast:")
@@ -165,3 +174,4 @@ flow = Flow(
 # bulb.set_brightness(100)
 bulb.start_flow(flow)
 print (bulb.get_properties())
+print (transition)
